@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { AppHeader } from "@/components/app-header"
 import { InputPanel } from "@/components/input-panel"
@@ -8,7 +8,7 @@ import { TopologyCanvas } from "@/components/topology-canvas"
 import { ControlPanel } from "@/components/control-panel"
 import { DetailsPanel } from "@/components/details-panel"
 import { parseOSPFData } from "@/lib/ospf-parser"
-import { buildGraph } from "@/lib/layout-engine"
+import { buildGraph, computeAutoFit } from "@/lib/layout-engine"
 import { sampleOSPFData } from "@/lib/sample-data"
 import { usePolling } from "@/lib/polling-client"
 import { diffTopologies, applyNodeStatuses, applyEdgeStatuses } from "@/lib/topology-diff"
@@ -55,6 +55,21 @@ export default function Page() {
   // Real-time event log
   const [events, setEvents] = useState<TopologyChange[]>([])
 
+  // Track canvas viewport size for layout scaling
+  const canvasSizeRef = useRef({ width: 900, height: 600 })
+  const handleCanvasSizeChange = useCallback((w: number, h: number) => {
+    canvasSizeRef.current = { width: w, height: h }
+  }, [])
+
+  // Auto-fit view to show all nodes in the current viewport
+  const autoFitView = useCallback((graphNodes: GraphNode[]) => {
+    const { width, height } = canvasSizeRef.current
+    const fit = computeAutoFit(graphNodes, width, height)
+    setZoom(fit.zoom)
+    setPanX(fit.panX)
+    setPanY(fit.panY)
+  }, [])
+
   // Fire toast notifications for topology changes
   const notifyChanges = useCallback((changes: TopologyChange[]) => {
     for (const change of changes) {
@@ -95,7 +110,8 @@ export default function Page() {
   // Handle topology update from polling
   const handlePollingUpdate = useCallback(
     (newTopo: OSPFTopology, changes: TopologyChange[]) => {
-      const graph = buildGraph(newTopo, layout, 900, 600)
+      const { width, height } = canvasSizeRef.current
+      const graph = buildGraph(newTopo, layout, width, height)
 
       if (changes.length > 0) {
         const annotatedNodes = applyNodeStatuses(graph.nodes, changes, nodes)
@@ -104,6 +120,7 @@ export default function Page() {
         setEdges(annotatedEdges)
         setEvents((prev) => [...prev, ...changes])
         notifyChanges(changes)
+        autoFitView(annotatedNodes)
       } else {
         setNodes(graph.nodes)
         setEdges(graph.edges)
@@ -111,7 +128,7 @@ export default function Page() {
 
       setTopology(newTopo)
     },
-    [layout, nodes, edges, notifyChanges]
+    [layout, nodes, edges, notifyChanges, autoFitView]
   )
 
   const { pollingState, startPolling, stopPolling, setInterval: setPollingInterval } =
@@ -130,6 +147,10 @@ export default function Page() {
         const graph = buildGraph(parsed, "force-directed", 900, 600)
         setNodes(graph.nodes)
         setEdges(graph.edges)
+        const fit = computeAutoFit(graph.nodes, 900, 600)
+        setZoom(fit.zoom)
+        setPanX(fit.panX)
+        setPanY(fit.panY)
       }
     } catch {
       // Silently fail
@@ -179,13 +200,12 @@ export default function Page() {
   const handleParse = useCallback(() => {
     setIsParsing(true)
     setParseError(null)
+    const { width, height } = canvasSizeRef.current
 
     try {
       const parsed = parseOSPFData(inputText)
       if (parsed.routers.length === 0 && parsed.networks.length === 0) {
-        setParseError(
-          "No OSPF data found. Make sure the input contains valid OSPF LSA data."
-        )
+        setParseError("No OSPF data found. Make sure the input contains valid OSPF LSA data.")
         setIsParsing(false)
         return
       }
@@ -194,7 +214,7 @@ export default function Page() {
       if (topology) {
         const changes = diffTopologies(topology, parsed)
         if (changes.length > 0) {
-          const graph = buildGraph(parsed, layout, 900, 600)
+          const graph = buildGraph(parsed, layout, width, height)
           const annotatedNodes = applyNodeStatuses(graph.nodes, changes, nodes)
           const annotatedEdges = applyEdgeStatuses(graph.edges, changes, edges)
           setNodes(annotatedNodes)
@@ -202,46 +222,46 @@ export default function Page() {
           setEvents((prev) => [...prev, ...changes])
           notifyChanges(changes)
           setTopology(parsed)
+          autoFitView(annotatedNodes)
           setIsParsing(false)
           return
         }
       }
 
       setTopology(parsed)
-      const graph = buildGraph(parsed, layout, 900, 600)
+      const graph = buildGraph(parsed, layout, width, height)
       setNodes(graph.nodes)
       setEdges(graph.edges)
       setSelectedNodeId(null)
       setSelectedEdgeId(null)
-      setZoom(1)
-      setPanX(0)
-      setPanY(0)
+      autoFitView(graph.nodes)
       setFilterArea(null)
       setFilterLinkType(null)
     } catch {
-      setParseError(
-        "Failed to parse OSPF data. Please check the input format."
-      )
+      setParseError("Failed to parse OSPF data. Please check the input format.")
     }
 
     setIsParsing(false)
-  }, [inputText, layout, topology, nodes, edges, notifyChanges])
+  }, [inputText, layout, topology, nodes, edges, notifyChanges, autoFitView])
 
   const handleLayoutChange = useCallback(
     (newLayout: LayoutAlgorithm) => {
       setLayout(newLayout)
       if (topology) {
-        const graph = buildGraph(topology, newLayout, 900, 600)
+        const { width, height } = canvasSizeRef.current
+        const graph = buildGraph(topology, newLayout, width, height)
         setNodes(graph.nodes)
         setEdges(graph.edges)
+        autoFitView(graph.nodes)
       }
     },
-    [topology]
+    [topology, autoFitView]
   )
 
   const handleLoadSample = useCallback(() => {
     setInputText(sampleOSPFData)
     setParseError(null)
+    const { width, height } = canvasSizeRef.current
 
     try {
       const parsed = parseOSPFData(sampleOSPFData)
@@ -250,20 +270,18 @@ export default function Page() {
         return
       }
       setTopology(parsed)
-      const graph = buildGraph(parsed, layout, 900, 600)
+      const graph = buildGraph(parsed, layout, width, height)
       setNodes(graph.nodes)
       setEdges(graph.edges)
       setSelectedNodeId(null)
       setSelectedEdgeId(null)
-      setZoom(1)
-      setPanX(0)
-      setPanY(0)
+      autoFitView(graph.nodes)
       setFilterArea(null)
       setFilterLinkType(null)
     } catch {
       setParseError("Failed to parse sample data.")
     }
-  }, [layout])
+  }, [layout, autoFitView])
 
   const handleClear = useCallback(() => {
     setInputText("")
@@ -300,7 +318,6 @@ export default function Page() {
         },
       ]
 
-      // Add node to graph
       const newNode: GraphNode = {
         id: newId,
         type: "router",
@@ -322,7 +339,6 @@ export default function Page() {
         statusTimestamp: now,
       }
 
-      // Connect to a random existing router
       const existingRouter =
         topology.routers[Math.floor(Math.random() * topology.routers.length)]
       const newEdge: GraphEdge = {
@@ -426,10 +442,8 @@ export default function Page() {
   }, [])
 
   const handleResetView = useCallback(() => {
-    setZoom(1)
-    setPanX(0)
-    setPanY(0)
-  }, [])
+    autoFitView(nodes)
+  }, [nodes, autoFitView])
 
   const handlePanChange = useCallback((x: number, y: number) => {
     setPanX(x)
@@ -497,6 +511,7 @@ export default function Page() {
             onSelectEdge={setSelectedEdgeId}
             onZoomChange={setZoom}
             onPanChange={handlePanChange}
+            onSizeChange={handleCanvasSizeChange}
           />
         </div>
 
@@ -504,9 +519,7 @@ export default function Page() {
         <button
           onClick={() => setShowRightPanel(!showRightPanel)}
           className="flex items-center justify-center w-5 shrink-0 border-l border-border bg-card hover:bg-secondary/50 transition-colors"
-          aria-label={
-            showRightPanel ? "Hide control panel" : "Show control panel"
-          }
+          aria-label={showRightPanel ? "Hide control panel" : "Show control panel"}
         >
           {showRightPanel ? (
             <ChevronRight className="w-3 h-3 text-muted-foreground" />
