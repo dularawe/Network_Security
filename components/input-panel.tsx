@@ -9,7 +9,6 @@ interface InputPanelProps {
   value: string
   onChange: (value: string) => void
   onParse: () => void
-  onLoadSample: () => void
   onClear: () => void
   isParsing: boolean
   parseError: string | null
@@ -19,7 +18,6 @@ export function InputPanel({
   value,
   onChange,
   onParse,
-  onLoadSample,
   onClear,
   isParsing,
   parseError,
@@ -50,17 +48,10 @@ export function InputPanel({
             variant="ghost"
             size="sm"
             className="h-7 text-xs text-muted-foreground hover:text-foreground"
-            onClick={onLoadSample}
-          >
-            Sample
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground hover:text-foreground"
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="w-3.5 h-3.5" />
+            <Upload className="w-3.5 h-3.5 mr-1" />
+            Upload
           </Button>
           <Button
             variant="ghost"
@@ -77,7 +68,7 @@ export function InputPanel({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.log,.pcap"
+        accept=".txt,.log"
         onChange={handleFileUpload}
         className="hidden"
         aria-label="Upload OSPF data file"
@@ -86,7 +77,7 @@ export function InputPanel({
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={'Paste OSPF LSA data here...\n\nSupported formats:\n- Cisco "show ip ospf database" output\n- Wireshark OSPF captures\n- Structured LSA data'}
+        placeholder={'Paste OSPF LSA data here...\n\nSupported formats:\n- Cisco "show ip ospf database" output\n- Wireshark OSPF LSA captures'}
         className="flex-1 resize-none font-mono text-xs bg-secondary/30 border-border placeholder:text-muted-foreground/50 min-h-[200px]"
       />
 
@@ -112,7 +103,7 @@ export function InputPanel({
           Automated Push Mode
         </p>
         <p className="text-[10px] text-muted-foreground leading-relaxed mb-2">
-          Push OSPF data via API for real-time monitoring. Enable polling in the control panel, then run:
+          Push OSPF data via API for real-time monitoring. Enable polling in the control panel, then send data to the endpoint.
         </p>
         <pre className="text-[9px] font-mono bg-background/50 rounded px-2 py-1.5 text-muted-foreground overflow-x-auto whitespace-pre-wrap leading-relaxed">
 {`ssh router "show ip ospf database" \\
