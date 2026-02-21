@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Download, RotateCcw, Radio, Zap, Activity } from "lucide-react"
+import { Download, RotateCcw, Radio, Activity } from "lucide-react"
 import type { LayoutAlgorithm, LinkType, PollingState, TopologyChange } from "@/lib/ospf-types"
 import { getAreaColor } from "@/lib/layout-engine"
 import { EventLog } from "@/components/event-log"
@@ -27,12 +27,10 @@ interface ControlPanelProps {
   onResetView: () => void
   nodeCount: number
   edgeCount: number
-  // Live monitoring props
   pollingState: PollingState
   onStartPolling: () => void
   onStopPolling: () => void
   onSetPollingInterval: (ms: number) => void
-  onSimulateChange: () => void
   events: TopologyChange[]
 }
 
@@ -58,7 +56,6 @@ export function ControlPanel({
   onStartPolling,
   onStopPolling,
   onSetPollingInterval,
-  onSimulateChange,
   events,
 }: ControlPanelProps) {
   return (
@@ -110,15 +107,6 @@ export function ControlPanel({
               <p className="text-[10px] text-destructive">{pollingState.errorMessage}</p>
             </div>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full text-xs justify-start gap-2 border-amber-500/30 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-            onClick={onSimulateChange}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            Simulate Change
-          </Button>
         </div>
       </div>
 
@@ -246,7 +234,6 @@ export function ControlPanel({
             </div>
           ))}
           <div className="h-px bg-border my-1" />
-          {/* Status legend for real-time */}
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs text-secondary-foreground">New / Online</span>
