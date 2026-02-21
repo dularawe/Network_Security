@@ -19,6 +19,7 @@ interface TopologyCanvasProps {
   onSelectEdge: (id: string | null) => void
   onZoomChange: (zoom: number) => void
   onPanChange: (x: number, y: number) => void
+  onSizeChange?: (width: number, height: number) => void
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -204,6 +205,7 @@ export function TopologyCanvas({
   onSelectEdge,
   onZoomChange,
   onPanChange,
+  onSizeChange,
 }: TopologyCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -224,12 +226,15 @@ export function TopologyCanvas({
       const entry = entries[0]
       if (entry) {
         const { width, height } = entry.contentRect
-        setCanvasSize({ width: Math.floor(width), height: Math.floor(height) })
+        const w = Math.floor(width)
+        const h = Math.floor(height)
+        setCanvasSize({ width: w, height: h })
+        onSizeChange?.(w, h)
       }
     })
     observer.observe(container)
     return () => observer.disconnect()
-  }, [])
+  }, [onSizeChange])
 
   const getNodeColor = useCallback(
     (node: GraphNode): string => {
