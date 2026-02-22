@@ -131,7 +131,7 @@ export function TopologySearch({ nodes, onSelectNode, onFocusNode }: TopologySea
             if (query.length > 0) setIsOpen(true)
           }}
           onKeyDown={handleKeyDown}
-          className="h-9 bg-secondary/50 border-border pl-9 pr-8 text-sm placeholder:text-muted-foreground/50"
+          className="h-10 bg-card/95 backdrop-blur-sm border-border shadow-lg shadow-black/40 pl-9 pr-8 text-sm placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-primary/40 focus:border-primary/50"
           aria-label="Search topology"
           role="combobox"
           aria-expanded={isOpen && results.length > 0}
@@ -156,7 +156,7 @@ export function TopologySearch({ nodes, onSelectNode, onFocusNode }: TopologySea
       {isOpen && results.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-border bg-card shadow-xl shadow-black/30"
+          className="absolute z-50 mt-1.5 w-full max-h-80 overflow-auto rounded-lg border border-border bg-card/98 backdrop-blur-md shadow-2xl shadow-black/50 ring-1 ring-white/5"
           role="listbox"
         >
           {results.map((result, idx) => (
@@ -206,7 +206,7 @@ export function TopologySearch({ nodes, onSelectNode, onFocusNode }: TopologySea
       {isOpen && query.length >= 1 && results.length === 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-card p-4 shadow-xl shadow-black/30"
+          className="absolute z-50 mt-1.5 w-full rounded-lg border border-border bg-card/98 backdrop-blur-md p-4 shadow-2xl shadow-black/50 ring-1 ring-white/5"
         >
           <p className="text-center text-sm text-muted-foreground">
             No devices matching &ldquo;{query}&rdquo;

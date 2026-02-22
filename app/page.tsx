@@ -312,7 +312,7 @@ export default function Page() {
         <div className="flex-1 flex flex-col relative min-w-0">
           {/* Search bar overlay */}
           {hasTopology && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-80">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-[420px]">
               <TopologySearch
                 nodes={filteredNodes}
                 onSelectNode={setSelectedNodeId}

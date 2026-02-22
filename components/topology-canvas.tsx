@@ -239,6 +239,25 @@ export function TopologyCanvas({
     return map
   }, [localNodes])
 
+  // Pre-compute total cost per node (sum of all connected edge costs)
+  const nodeCostMap = useMemo(() => {
+    const costMap = new Map<string, { total: number; linkCount: number; minCost: number }>()
+    for (const edge of edges) {
+      const cost = edge.cost || 0
+      for (const nid of [edge.source, edge.target]) {
+        const entry = costMap.get(nid)
+        if (entry) {
+          entry.total += cost
+          entry.linkCount += 1
+          if (cost > 0 && cost < entry.minCost) entry.minCost = cost
+        } else {
+          costMap.set(nid, { total: cost, linkCount: 1, minCost: cost || Infinity })
+        }
+      }
+    }
+    return costMap
+  }, [edges])
+
   const getNodeColor = useCallback(
     (node: GraphNode): string => {
       if (colorBy === "area") return getAreaColor(node.area)
@@ -542,25 +561,48 @@ export function TopologyCanvas({
       }
 
       // Labels
+      let labelBottomY = node.type === "router" ? node.y + 18 : node.y + 14
       if (showLabels && detailLevel !== "minimal") {
         ctx.font = detailLevel === "simple" ? "bold 9px monospace" : "bold 11px monospace"
         ctx.textAlign = "center"
         ctx.textBaseline = "top"
         const lw = ctx.measureText(node.label).width + 8
-        const ly = node.type === "router" ? node.y + 18 : node.y + 14
         ctx.fillStyle = "#0d1117cc"
         ctx.beginPath()
-        ctx.roundRect(node.x - lw / 2, ly - 2, lw, 16, 3)
+        ctx.roundRect(node.x - lw / 2, labelBottomY - 2, lw, 16, 3)
         ctx.fill()
         ctx.fillStyle = "#e2e8f0"
-        ctx.fillText(node.label, node.x, ly)
+        ctx.fillText(node.label, node.x, labelBottomY)
+        labelBottomY += 18
+      }
+
+      // Cost badge per node
+      if (showMetrics && detailLevel !== "minimal") {
+        const costInfo = nodeCostMap.get(node.id)
+        if (costInfo && costInfo.linkCount > 0) {
+          const costLabel = `${costInfo.linkCount} links | cost ${costInfo.total}`
+          ctx.font = "bold 8px monospace"
+          const cw = ctx.measureText(costLabel).width + 10
+          const cy = labelBottomY + 1
+          ctx.fillStyle = color + "20"
+          ctx.strokeStyle = color + "50"
+          ctx.lineWidth = 0.8
+          ctx.beginPath()
+          ctx.roundRect(node.x - cw / 2, cy - 1, cw, 13, 3)
+          ctx.fill()
+          ctx.stroke()
+          ctx.fillStyle = color + "cc"
+          ctx.textAlign = "center"
+          ctx.textBaseline = "top"
+          ctx.fillText(costLabel, node.x, cy + 1)
+        }
       }
 
       ctx.restore()
     }
 
     ctx.restore()
-  }, [localNodes, edges, selectedNodeId, selectedEdgeId, showLabels, showMetrics, colorBy, zoom, panX, panY, canvasSize, getNodeColor, nodeMap, detailLevel, viewport, isInViewport])
+  }, [localNodes, edges, selectedNodeId, selectedEdgeId, showLabels, showMetrics, colorBy, zoom, panX, panY, canvasSize, getNodeColor, nodeMap, nodeCostMap, detailLevel, viewport, isInViewport])
 
   useEffect(() => { draw() }, [draw])
 
