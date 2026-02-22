@@ -210,7 +210,6 @@ export function DetailsPanel({ selectedNode, selectedEdge, nodes, onClose }: Det
           </div>
 
           <div className="flex flex-col gap-0">
-            <DetailRow label="Cost" value={selectedEdge.cost} mono />
             <DetailRow label="Link Type" value={selectedEdge.linkType} />
             <DetailRow label="Area" value={`Area ${selectedEdge.area}`} />
             {selectedEdge.interfaceInfo && (
@@ -218,6 +217,62 @@ export function DetailsPanel({ selectedNode, selectedEdge, nodes, onClose }: Det
             )}
             <DetailRow label="Source" value={sourceNode?.label || selectedEdge.source} mono />
             <DetailRow label="Target" value={targetNode?.label || selectedEdge.target} mono />
+          </div>
+
+          {/* Directional cost display */}
+          <div className="mt-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Link Costs
+            </h4>
+            {(() => {
+              const sCost = selectedEdge.sourceCost ?? selectedEdge.cost
+              const tCost = selectedEdge.targetCost ?? selectedEdge.cost
+              const isAsymmetric = sCost !== tCost
+              return (
+                <div className="flex flex-col gap-1.5">
+                  <div
+                    className="flex items-center justify-between rounded px-2.5 py-1.5"
+                    style={{
+                      backgroundColor: isAsymmetric ? "#f8717112" : color + "12",
+                      borderLeft: `3px solid ${isAsymmetric ? "#f87171" : color}`,
+                    }}
+                  >
+                    <span className="font-mono text-[11px] text-foreground/80">
+                      {sourceNode?.label || selectedEdge.source}
+                    </span>
+                    <span
+                      className="font-mono text-sm font-bold"
+                      style={{ color: isAsymmetric ? "#f87171" : color }}
+                    >
+                      {sCost}
+                    </span>
+                  </div>
+                  <div
+                    className="flex items-center justify-between rounded px-2.5 py-1.5"
+                    style={{
+                      backgroundColor: isAsymmetric ? "#f8717112" : color + "12",
+                      borderLeft: `3px solid ${isAsymmetric ? "#f87171" : color}`,
+                    }}
+                  >
+                    <span className="font-mono text-[11px] text-foreground/80">
+                      {targetNode?.label || selectedEdge.target}
+                    </span>
+                    <span
+                      className="font-mono text-sm font-bold"
+                      style={{ color: isAsymmetric ? "#f87171" : color }}
+                    >
+                      {tCost}
+                    </span>
+                  </div>
+                  {isAsymmetric && (
+                    <p className="text-[10px] text-destructive mt-1 flex items-center gap-1">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-destructive" />
+                      Asymmetric costs detected
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
       </ScrollArea>

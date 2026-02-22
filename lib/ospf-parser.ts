@@ -19,7 +19,7 @@ export function parseOSPFData(input: string): OSPFTopology {
   const networkMap = new Map<string, OSPFNetwork>()
   const links: OSPFLink[] = []
   const areas = new Set<string>()
-  const processedP2P = new Set<string>()
+  const p2pCosts = new Map<string, { srcId: string; tgtId: string; srcCost: number; tgtCost: number; ifInfo: string; area: string }>()
 
   // Build routers from Router LSAs
   for (const lsa of routerLSAs) {
@@ -56,16 +56,24 @@ export function parseOSPFData(input: string): OSPFTopology {
         if (!router.neighbors.includes(link.linkId)) {
           router.neighbors.push(link.linkId)
         }
+        // Track costs from both directions
         const key = [rid, link.linkId].sort().join("-")
-        if (!processedP2P.has(key)) {
-          processedP2P.add(key)
-          links.push({
-            id: `p2p-${rid}-${link.linkId}`,
-            source: rid,
-            target: link.linkId,
-            cost: link.metric,
-            linkType: "point-to-point",
-            interfaceInfo: link.linkData,
+        const existing = p2pCosts.get(key)
+        if (existing) {
+          // Second direction: fill in the other side's cost
+          if (rid === existing.srcId) {
+            existing.srcCost = link.metric
+          } else {
+            existing.tgtCost = link.metric
+          }
+        } else {
+          // First direction seen
+          p2pCosts.set(key, {
+            srcId: rid,
+            tgtId: link.linkId,
+            srcCost: link.metric,
+            tgtCost: link.metric, // default same until we see the other side
+            ifInfo: link.linkData,
             area: lsa.area,
           })
         }
@@ -80,6 +88,21 @@ export function parseOSPFData(input: string): OSPFTopology {
         }
       }
     }
+  }
+
+  // Build directional P2P links from collected cost data
+  for (const [, p] of p2pCosts) {
+    links.push({
+      id: `p2p-${p.srcId}-${p.tgtId}`,
+      source: p.srcId,
+      target: p.tgtId,
+      cost: Math.max(p.srcCost, p.tgtCost),
+      sourceCost: p.srcCost,
+      targetCost: p.tgtCost,
+      linkType: "point-to-point",
+      interfaceInfo: p.ifInfo,
+      area: p.area,
+    })
   }
 
   // Build networks from Network LSAs
@@ -102,6 +125,8 @@ export function parseOSPFData(input: string): OSPFTopology {
         source: nid,
         target: ar,
         cost: 0,
+        sourceCost: 0,
+        targetCost: 0,
         linkType: "transit",
         area: nlsa.area,
       })

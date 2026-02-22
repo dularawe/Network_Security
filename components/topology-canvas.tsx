@@ -239,24 +239,7 @@ export function TopologyCanvas({
     return map
   }, [localNodes])
 
-  // Pre-compute total cost per node (sum of all connected edge costs)
-  const nodeCostMap = useMemo(() => {
-    const costMap = new Map<string, { total: number; linkCount: number; minCost: number }>()
-    for (const edge of edges) {
-      const cost = edge.cost || 0
-      for (const nid of [edge.source, edge.target]) {
-        const entry = costMap.get(nid)
-        if (entry) {
-          entry.total += cost
-          entry.linkCount += 1
-          if (cost > 0 && cost < entry.minCost) entry.minCost = cost
-        } else {
-          costMap.set(nid, { total: cost, linkCount: 1, minCost: cost || Infinity })
-        }
-      }
-    }
-    return costMap
-  }, [edges])
+
 
   const getNodeColor = useCallback(
     (node: GraphNode): string => {
@@ -417,28 +400,73 @@ export function TopologyCanvas({
       ctx.setLineDash([])
       ctx.shadowBlur = 0
 
-      // Cost label on EVERY edge line (always visible)
-      if (edge.cost > 0) {
-        const midX = (sourceNode.x + targetNode.x) / 2
-        const midY = (sourceNode.y + targetNode.y) / 2
-        const costText = edge.status === "changed" && edge.oldCost != null
-          ? `${edge.oldCost} -> ${edge.cost}`
-          : `${edge.cost}`
-        const costFont = detailLevel === "detailed" ? "bold 10px monospace" : "bold 8px monospace"
-        ctx.font = costFont
-        const costW = ctx.measureText(costText).width + 8
-        const costH = detailLevel === "detailed" ? 16 : 13
-        ctx.fillStyle = "#0f1520ee"
-        ctx.strokeStyle = (statusCol || edgeColor) + "60"
-        ctx.lineWidth = 0.8
-        ctx.beginPath()
-        ctx.roundRect(midX - costW / 2, midY - costH / 2, costW, costH, 3)
-        ctx.fill()
-        ctx.stroke()
-        ctx.fillStyle = statusCol || edgeColor
-        ctx.textAlign = "center"
-        ctx.textBaseline = "middle"
-        ctx.fillText(costText, midX, midY)
+      // Per-side cost labels on every edge
+      const sCost = edge.sourceCost ?? edge.cost
+      const tCost = edge.targetCost ?? edge.cost
+      if (sCost > 0 || tCost > 0) {
+        const dx = targetNode.x - sourceNode.x
+        const dy = targetNode.y - sourceNode.y
+        const len = Math.sqrt(dx * dx + dy * dy)
+        if (len > 40) {
+          const nx = dx / len
+          const ny = dy / len
+          const isAsymmetric = sCost !== tCost
+          const costFont = detailLevel === "detailed" ? "bold 10px monospace" : "bold 8px monospace"
+          ctx.font = costFont
+          const asymColor = "#f87171"    // red for asymmetric
+          const normalColor = statusCol || edgeColor
+
+          // Source-side cost (25% from source along the line)
+          if (sCost > 0) {
+            const sx = sourceNode.x + nx * len * 0.25
+            const sy = sourceNode.y + ny * len * 0.25
+            // Offset perpendicular to the line so label sits beside it
+            const offX = -ny * 10
+            const offY = nx * 10
+            const lx = sx + offX
+            const ly = sy + offY
+            const sText = `${sCost}`
+            const sw = ctx.measureText(sText).width + 6
+            const sh = 14
+            const sColor = isAsymmetric ? asymColor : normalColor
+            ctx.fillStyle = "#0f1520ee"
+            ctx.strokeStyle = sColor + "60"
+            ctx.lineWidth = 0.8
+            ctx.beginPath()
+            ctx.roundRect(lx - sw / 2, ly - sh / 2, sw, sh, 3)
+            ctx.fill()
+            ctx.stroke()
+            ctx.fillStyle = sColor
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+            ctx.fillText(sText, lx, ly)
+          }
+
+          // Target-side cost (75% from source = 25% from target)
+          if (tCost > 0) {
+            const tx = sourceNode.x + nx * len * 0.75
+            const ty = sourceNode.y + ny * len * 0.75
+            const offX = -ny * 10
+            const offY = nx * 10
+            const lx = tx + offX
+            const ly = ty + offY
+            const tText = `${tCost}`
+            const tw = ctx.measureText(tText).width + 6
+            const th = 14
+            const tColor = isAsymmetric ? asymColor : normalColor
+            ctx.fillStyle = "#0f1520ee"
+            ctx.strokeStyle = tColor + "60"
+            ctx.lineWidth = 0.8
+            ctx.beginPath()
+            ctx.roundRect(lx - tw / 2, ly - th / 2, tw, th, 3)
+            ctx.fill()
+            ctx.stroke()
+            ctx.fillStyle = tColor
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+            ctx.fillText(tText, lx, ly)
+          }
+        }
       }
 
       // Interface dots + detailed labels
@@ -564,48 +592,25 @@ export function TopologyCanvas({
       }
 
       // Labels
-      let labelBottomY = node.type === "router" ? node.y + 18 : node.y + 14
       if (showLabels && detailLevel !== "minimal") {
+        const ly = node.type === "router" ? node.y + 18 : node.y + 14
         ctx.font = detailLevel === "simple" ? "bold 9px monospace" : "bold 11px monospace"
         ctx.textAlign = "center"
         ctx.textBaseline = "top"
         const lw = ctx.measureText(node.label).width + 8
         ctx.fillStyle = "#0d1117cc"
         ctx.beginPath()
-        ctx.roundRect(node.x - lw / 2, labelBottomY - 2, lw, 16, 3)
+        ctx.roundRect(node.x - lw / 2, ly - 2, lw, 16, 3)
         ctx.fill()
         ctx.fillStyle = "#e2e8f0"
-        ctx.fillText(node.label, node.x, labelBottomY)
-        labelBottomY += 18
-      }
-
-      // Cost badge per node
-      if (showMetrics && detailLevel !== "minimal") {
-        const costInfo = nodeCostMap.get(node.id)
-        if (costInfo && costInfo.linkCount > 0) {
-          const costLabel = `${costInfo.linkCount} links | cost ${costInfo.total}`
-          ctx.font = "bold 8px monospace"
-          const cw = ctx.measureText(costLabel).width + 10
-          const cy = labelBottomY + 1
-          ctx.fillStyle = color + "20"
-          ctx.strokeStyle = color + "50"
-          ctx.lineWidth = 0.8
-          ctx.beginPath()
-          ctx.roundRect(node.x - cw / 2, cy - 1, cw, 13, 3)
-          ctx.fill()
-          ctx.stroke()
-          ctx.fillStyle = color + "cc"
-          ctx.textAlign = "center"
-          ctx.textBaseline = "top"
-          ctx.fillText(costLabel, node.x, cy + 1)
-        }
+        ctx.fillText(node.label, node.x, ly)
       }
 
       ctx.restore()
     }
 
     ctx.restore()
-  }, [localNodes, edges, selectedNodeId, selectedEdgeId, showLabels, showMetrics, colorBy, zoom, panX, panY, canvasSize, getNodeColor, nodeMap, nodeCostMap, detailLevel, viewport, isInViewport])
+  }, [localNodes, edges, selectedNodeId, selectedEdgeId, showLabels, showMetrics, colorBy, zoom, panX, panY, canvasSize, getNodeColor, nodeMap, detailLevel, viewport, isInViewport])
 
   useEffect(() => { draw() }, [draw])
 

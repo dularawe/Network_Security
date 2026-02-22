@@ -346,15 +346,42 @@ export function TopologySearch({ nodes, edges, onSelectNode, onFocusNode }: Topo
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-muted-foreground">{edge.linkType}</span>
-                          <span
-                            className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded text-xs"
-                            style={{
-                              color: getAreaColor(edge.area),
-                              backgroundColor: getAreaColor(edge.area) + "15",
-                            }}
-                          >
-                            cost {edge.cost}
-                          </span>
+                          {(() => {
+                            const sCost = edge.sourceCost ?? edge.cost
+                            const tCost = edge.targetCost ?? edge.cost
+                            const isMe = edge.source === popupNode.id
+                            const myCost = isMe ? sCost : tCost
+                            const peerCost = isMe ? tCost : sCost
+                            const isAsymmetric = sCost !== tCost
+                            const areaCol = getAreaColor(edge.area)
+                            if (isAsymmetric) {
+                              return (
+                                <div className="flex items-center gap-1">
+                                  <span
+                                    className="font-mono text-[10px] font-bold px-1 py-0.5 rounded"
+                                    style={{ color: "#f87171", backgroundColor: "#f8717115" }}
+                                  >
+                                    {myCost}
+                                  </span>
+                                  <span className="text-[9px] text-muted-foreground/50">/</span>
+                                  <span
+                                    className="font-mono text-[10px] font-bold px-1 py-0.5 rounded"
+                                    style={{ color: "#f87171", backgroundColor: "#f8717115" }}
+                                  >
+                                    {peerCost}
+                                  </span>
+                                </div>
+                              )
+                            }
+                            return (
+                              <span
+                                className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded text-xs"
+                                style={{ color: areaCol, backgroundColor: areaCol + "15" }}
+                              >
+                                cost {myCost}
+                              </span>
+                            )
+                          })()}
                         </div>
                       </div>
                     )
