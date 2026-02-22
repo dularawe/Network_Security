@@ -65,6 +65,8 @@ export default function Page() {
   const [panY, setPanY] = useState(0)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [filterArea, setFilterArea] = useState<string | null>(null)
   const [filterLinkType, setFilterLinkType] = useState<LinkType | null>(null)
   const [showLeftPanel, setShowLeftPanel] = useState(true)
@@ -196,6 +198,55 @@ export default function Page() {
     }, 50)
   }, [inputText, layout, topology, nodes, edges, notifyChanges, autoFitView])
 
+  // ── SSH data received ──
+  const handleSSHData = useCallback(
+    (data: string, host: string) => {
+      setInputText(data)
+      setParseError(null)
+      const { width, height } = canvasSizeRef.current
+
+      try {
+        const parsed = parseOSPFData(data)
+        if (parsed.routers.length === 0 && parsed.networks.length === 0) {
+          setParseError("Connected but no OSPF data found on " + host)
+          return
+        }
+
+        // Diff if we have a previous topology
+        if (topology) {
+          const changes = diffTopologies(topology, parsed)
+          if (changes.length > 0) {
+            const graph = buildGraph(parsed, layout, width, height)
+            const annotatedNodes = applyNodeStatuses(graph.nodes, changes, nodes)
+            const annotatedEdges = applyEdgeStatuses(graph.edges, changes, edges)
+            setNodes(annotatedNodes)
+            setEdges(annotatedEdges)
+            setEvents((prev) => [...changes, ...prev].slice(0, 200))
+            notifyChanges(changes)
+            setTopology(parsed)
+            autoFitView(annotatedNodes)
+            toast.success(`Updated topology from ${host}: ${changes.length} change(s)`)
+            return
+          }
+        }
+
+        setTopology(parsed)
+        const graph = buildGraph(parsed, layout, width, height)
+        setNodes(graph.nodes)
+        setEdges(graph.edges)
+        setSelectedNodeId(null)
+        setSelectedEdgeId(null)
+        autoFitView(graph.nodes)
+        setFilterArea(null)
+        setFilterLinkType(null)
+        toast.success(`Loaded ${parsed.routers.length} routers from ${host}`)
+      } catch {
+        setParseError("Failed to parse OSPF data from " + host)
+      }
+    },
+    [topology, layout, nodes, edges, notifyChanges, autoFitView]
+  )
+
   // ── Clear ──
   const handleClear = useCallback(() => {
     setInputText("")
@@ -234,6 +285,11 @@ export default function Page() {
       setPanY(height / 2 - node.y * targetZoom)
       setZoom(targetZoom)
       setSelectedNodeId(nodeId)
+
+      // Set focus highlight with auto-clear after 6s
+      setFocusedNodeId(nodeId)
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current)
+      focusTimerRef.current = setTimeout(() => setFocusedNodeId(null), 6000)
     },
     [nodes, zoom]
   )
@@ -288,6 +344,7 @@ export default function Page() {
                 onChange={setInputText}
                 onParse={handleParse}
                 onClear={handleClear}
+                onSSHData={handleSSHData}
                 isParsing={isParsing}
                 parseError={parseError}
               />
@@ -328,6 +385,7 @@ export default function Page() {
               edges={filteredEdges}
               selectedNodeId={selectedNodeId}
               selectedEdgeId={selectedEdgeId}
+              focusedNodeId={focusedNodeId}
               showLabels={showLabels}
               showMetrics={showMetrics}
               colorBy={colorBy}
