@@ -67,6 +67,8 @@ export function buildGraph(
       source: link.source,
       target: link.target,
       cost: link.cost,
+      sourceCost: link.sourceCost ?? link.cost,
+      targetCost: link.targetCost ?? link.cost,
       linkType: link.linkType,
       area: link.area,
       interfaceInfo: link.interfaceInfo,

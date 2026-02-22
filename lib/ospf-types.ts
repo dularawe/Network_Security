@@ -36,6 +36,8 @@ export interface OSPFLink {
   source: string
   target: string
   cost: number
+  sourceCost: number
+  targetCost: number
   linkType: LinkType
   interfaceInfo?: string
   area: string
@@ -66,6 +68,8 @@ export interface GraphEdge {
   source: string
   target: string
   cost: number
+  sourceCost: number    // cost from source side
+  targetCost: number    // cost from target side
   linkType: LinkType
   area: string
   interfaceInfo?: string
