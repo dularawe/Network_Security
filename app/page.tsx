@@ -65,6 +65,8 @@ export default function Page() {
   const [panY, setPanY] = useState(0)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [filterArea, setFilterArea] = useState<string | null>(null)
   const [filterLinkType, setFilterLinkType] = useState<LinkType | null>(null)
   const [showLeftPanel, setShowLeftPanel] = useState(true)
@@ -234,6 +236,11 @@ export default function Page() {
       setPanY(height / 2 - node.y * targetZoom)
       setZoom(targetZoom)
       setSelectedNodeId(nodeId)
+
+      // Set focus highlight with auto-clear after 6s
+      setFocusedNodeId(nodeId)
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current)
+      focusTimerRef.current = setTimeout(() => setFocusedNodeId(null), 6000)
     },
     [nodes, zoom]
   )
@@ -328,6 +335,7 @@ export default function Page() {
               edges={filteredEdges}
               selectedNodeId={selectedNodeId}
               selectedEdgeId={selectedEdgeId}
+              focusedNodeId={focusedNodeId}
               showLabels={showLabels}
               showMetrics={showMetrics}
               colorBy={colorBy}

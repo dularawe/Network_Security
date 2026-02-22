@@ -9,6 +9,7 @@ interface TopologyCanvasProps {
   edges: GraphEdge[]
   selectedNodeId: string | null
   selectedEdgeId: string | null
+  focusedNodeId: string | null
   showLabels: boolean
   showMetrics: boolean
   colorBy: "area" | "lsa-type" | "role"
@@ -193,6 +194,7 @@ export function TopologyCanvas({
   edges,
   selectedNodeId,
   selectedEdgeId,
+  focusedNodeId,
   showLabels,
   showMetrics,
   colorBy,
@@ -212,6 +214,12 @@ export function TopologyCanvas({
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 })
   const [dragNodeId, setDragNodeId] = useState<string | null>(null)
   const [localNodes, setLocalNodes] = useState<GraphNode[]>(nodes)
+  const focusStartRef = useRef<number>(0)
+
+  // Track when focusedNodeId changes
+  useEffect(() => {
+    if (focusedNodeId) focusStartRef.current = Date.now()
+  }, [focusedNodeId])
 
   useEffect(() => { setLocalNodes(nodes) }, [nodes])
 
@@ -606,18 +614,72 @@ export function TopologyCanvas({
         ctx.fillText(node.label, node.x, ly)
       }
 
+      // Focus highlight ring -- bright pulsing circle when search focuses this node
+      if (node.id === focusedNodeId) {
+        const elapsed = Date.now() - focusStartRef.current
+        const FOCUS_DURATION = 6000
+        if (elapsed < FOCUS_DURATION) {
+          const decay = 1 - elapsed / FOCUS_DURATION
+          const pulse = 0.5 + 0.5 * Math.sin(elapsed / 180)
+          const focusColor = "#fbbf24" // amber/yellow
+
+          // Outer pulsing ring
+          const outerRadius = 38 + 8 * pulse
+          ctx.strokeStyle = focusColor
+          ctx.lineWidth = 2.5 * decay
+          ctx.globalAlpha = decay * 0.9
+          ctx.setLineDash([6, 4])
+          ctx.beginPath()
+          ctx.arc(node.x, node.y, outerRadius, 0, Math.PI * 2)
+          ctx.stroke()
+          ctx.setLineDash([])
+
+          // Inner solid ring
+          const innerRadius = 30
+          ctx.strokeStyle = focusColor
+          ctx.lineWidth = 2 * decay
+          ctx.globalAlpha = decay
+          ctx.beginPath()
+          ctx.arc(node.x, node.y, innerRadius, 0, Math.PI * 2)
+          ctx.stroke()
+
+          // Radial glow fill
+          const glowR = 45 + 10 * pulse
+          const gradient = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, glowR)
+          gradient.addColorStop(0, focusColor + Math.round(decay * 40).toString(16).padStart(2, "0"))
+          gradient.addColorStop(1, focusColor + "00")
+          ctx.fillStyle = gradient
+          ctx.globalAlpha = decay * 0.7
+          ctx.beginPath()
+          ctx.arc(node.x, node.y, glowR, 0, Math.PI * 2)
+          ctx.fill()
+
+          // Small crosshair at center
+          ctx.globalAlpha = decay * 0.5
+          ctx.strokeStyle = focusColor
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(node.x - 6, node.y)
+          ctx.lineTo(node.x + 6, node.y)
+          ctx.moveTo(node.x, node.y - 6)
+          ctx.lineTo(node.x, node.y + 6)
+          ctx.stroke()
+        }
+      }
+
       ctx.restore()
     }
 
     ctx.restore()
-  }, [localNodes, edges, selectedNodeId, selectedEdgeId, showLabels, showMetrics, colorBy, zoom, panX, panY, canvasSize, getNodeColor, nodeMap, detailLevel, viewport, isInViewport])
+  }, [localNodes, edges, selectedNodeId, selectedEdgeId, focusedNodeId, showLabels, showMetrics, colorBy, zoom, panX, panY, canvasSize, getNodeColor, nodeMap, detailLevel, viewport, isInViewport])
 
   useEffect(() => { draw() }, [draw])
 
   // Animation loop for status effects
   useEffect(() => {
     let animFrameId: number | null = null
-    const hasAnimations = localNodes.some(
+    const hasFocusAnim = focusedNodeId && (Date.now() - focusStartRef.current < 6000)
+    const hasAnimations = hasFocusAnim || localNodes.some(
       (n) => n.status && n.status !== "stable" && n.statusTimestamp
     ) || edges.some(
       (e) => e.status && e.status !== "stable" && e.statusTimestamp
@@ -637,7 +699,7 @@ export function TopologyCanvas({
     }
 
     return () => { if (animFrameId !== null) cancelAnimationFrame(animFrameId) }
-  }, [localNodes, edges, draw])
+  }, [localNodes, edges, draw, focusedNodeId])
 
   // Hit testing with nodeMap for O(1) lookups
   const getNodeAt = useCallback(
