@@ -417,7 +417,31 @@ export function TopologyCanvas({
       ctx.setLineDash([])
       ctx.shadowBlur = 0
 
-      // Interface dots + labels only at detailed level
+      // Cost label on EVERY edge line (always visible)
+      if (edge.cost > 0) {
+        const midX = (sourceNode.x + targetNode.x) / 2
+        const midY = (sourceNode.y + targetNode.y) / 2
+        const costText = edge.status === "changed" && edge.oldCost != null
+          ? `${edge.oldCost} -> ${edge.cost}`
+          : `${edge.cost}`
+        const costFont = detailLevel === "detailed" ? "bold 10px monospace" : "bold 8px monospace"
+        ctx.font = costFont
+        const costW = ctx.measureText(costText).width + 8
+        const costH = detailLevel === "detailed" ? 16 : 13
+        ctx.fillStyle = "#0f1520ee"
+        ctx.strokeStyle = (statusCol || edgeColor) + "60"
+        ctx.lineWidth = 0.8
+        ctx.beginPath()
+        ctx.roundRect(midX - costW / 2, midY - costH / 2, costW, costH, 3)
+        ctx.fill()
+        ctx.stroke()
+        ctx.fillStyle = statusCol || edgeColor
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText(costText, midX, midY)
+      }
+
+      // Interface dots + detailed labels
       if (detailLevel === "detailed") {
         const dx = targetNode.x - sourceNode.x
         const dy = targetNode.y - sourceNode.y
@@ -454,27 +478,6 @@ export function TopologyCanvas({
             ctx.textAlign = "center"
             ctx.textBaseline = "middle"
             ctx.fillText(edge.interfaceInfo, lx, ly)
-          }
-
-          if (showMetrics && edge.cost > 0) {
-            const midX = (sourceNode.x + targetNode.x) / 2
-            const midY = (sourceNode.y + targetNode.y) / 2
-            const costText = edge.status === "changed" && edge.oldCost != null
-              ? `${edge.oldCost} -> ${edge.cost}`
-              : `cost: ${edge.cost}`
-            ctx.font = "bold 10px monospace"
-            const costW = ctx.measureText(costText).width + 12
-            ctx.fillStyle = "#1a2233"
-            ctx.strokeStyle = (statusCol || edgeColor) + "60"
-            ctx.lineWidth = 1
-            ctx.beginPath()
-            ctx.roundRect(midX - costW / 2, midY - 9, costW, 18, 4)
-            ctx.fill()
-            ctx.stroke()
-            ctx.fillStyle = statusCol || edgeColor
-            ctx.textAlign = "center"
-            ctx.textBaseline = "middle"
-            ctx.fillText(costText, midX, midY)
           }
         }
       }

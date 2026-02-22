@@ -315,6 +315,7 @@ export default function Page() {
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 w-[420px]">
               <TopologySearch
                 nodes={filteredNodes}
+                edges={filteredEdges}
                 onSelectNode={setSelectedNodeId}
                 onFocusNode={handleFocusNode}
               />
